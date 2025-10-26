@@ -10,14 +10,17 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Yomar68/Jenkins_devops_exams.git', credentialsId: 'github-credentials'
+                git branch: 'main', 
+                    url: 'https://github.com/Yomar68/Jenkins_devops_exams.git', 
+                    credentialsId: 'github-credentials'
             }
         }
 
         stage('Build') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
+                    // Build Docker image depuis le dossier cast-service
+                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}", "cast-service")
                 }
             }
         }
