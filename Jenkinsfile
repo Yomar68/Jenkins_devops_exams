@@ -19,7 +19,6 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    // Build Docker image depuis le dossier cast-service
                     docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}", "cast-service")
                 }
             }
@@ -43,57 +42,20 @@ pipeline {
             }
         }
 
-        stage('Deploy to Dev') {
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
                     sh "kubectl config use-context minikube"
-                    sh "kubectl apply -f k8s/dev/ -n dev"
-                }
-            }
-        }
 
-        stage('Deploy to QA') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    sh "kubectl apply -f k8s/qa/ -n qa"
-                }
-            }
-        }
+                    // Liste des environnements et chemins
+                    def envs = ['dev', 'qa', 'staging', 'prod']
+                    envs.each { e ->
+                        // Crée le namespace s'il n'existe pas
+                        sh "kubectl get ns ${e} || kubectl create ns ${e}"
 
-        stage('Deploy to Staging') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    sh "kubectl apply -f k8s/staging/ -n staging"
-                }
-            }
-        }
-
-        stage('Approve Production') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    timeout(time: 1, unit: 'HOURS') {
-                        input message: 'Déployer en production?', ok: 'Déployer'
+                        // Applique les manifests
+                        sh "kubectl apply -f k8s/${e}/ -n ${e}"
                     }
-                }
-            }
-        }
-
-        stage('Deploy to Production') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    sh "kubectl apply -f k8s/prod/ -n prod"
                 }
             }
         }
