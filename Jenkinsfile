@@ -46,9 +46,7 @@ pipeline {
             steps {
                 script {
                     sh "kubectl config use-context minikube"
-                    // Crée le namespace s'il n'existe pas
                     sh "kubectl get ns dev || kubectl create ns dev"
-                    // Déploie en dev
                     sh "kubectl apply -f k8s/dev/ -n dev"
                 }
             }
@@ -60,9 +58,7 @@ pipeline {
             }
             steps {
                 script {
-                    // Crée le namespace s'il n'existe pas
                     sh "kubectl get ns qa || kubectl create ns qa"
-                    // Déploie en QA
                     sh "kubectl apply -f k8s/qa/ -n qa"
                 }
             }
@@ -74,9 +70,7 @@ pipeline {
             }
             steps {
                 script {
-                    // Crée le namespace s'il n'existe pas
                     sh "kubectl get ns staging || kubectl create ns staging"
-                    // Déploie en staging
                     sh "kubectl apply -f k8s/staging/ -n staging"
                 }
             }
@@ -103,14 +97,9 @@ pipeline {
             }
             steps {
                 script {
-                    // Crée le namespace s'il n'existe pas
                     sh "kubectl get ns prod || kubectl create ns prod"
-                    
-                    // OPTION 1: Utilisation des charts Helm (recommandé)
+                    // UTILISATION DES CHARTS HELM POUR LA PRODUCTION
                     sh "helm upgrade --install jenkins-exam-app charts/ -n prod --set image.repository=${DOCKER_IMAGE} --set image.tag=${env.BUILD_ID}"
-                    
-                    // OPTION 2: Fallback avec kubectl apply si Helm échoue
-                    sh "kubectl apply -f k8s/prod/ -n prod"
                 }
             }
         }
