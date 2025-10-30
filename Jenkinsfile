@@ -42,20 +42,75 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Dev') {
             steps {
                 script {
                     sh "kubectl config use-context minikube"
+                    // Crée le namespace s'il n'existe pas
+                    sh "kubectl get ns dev || kubectl create ns dev"
+                    // Déploie en dev
+                    sh "kubectl apply -f k8s/dev/ -n dev"
+                }
+            }
+        }
 
-                    // Liste des environnements et chemins
-                    def envs = ['dev', 'qa', 'staging', 'prod']
-                    envs.each { e ->
-                        // Crée le namespace s'il n'existe pas
-                        sh "kubectl get ns ${e} || kubectl create ns ${e}"
+        stage('Deploy to QA') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    // Crée le namespace s'il n'existe pas
+                    sh "kubectl get ns qa || kubectl create ns qa"
+                    // Déploie en QA
+                    sh "kubectl apply -f k8s/qa/ -n qa"
+                }
+            }
+        }
 
-                        // Applique les manifests
-                        sh "kubectl apply -f k8s/${e}/ -n ${e}"
+        stage('Deploy to Staging') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    // Crée le namespace s'il n'existe pas
+                    sh "kubectl get ns staging || kubectl create ns staging"
+                    // Déploie en staging
+                    sh "kubectl apply -f k8s/staging/ -n staging"
+                }
+            }
+        }
+
+        stage('Approve Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    timeout(time: 1, unit: 'HOURS') {
+                        input message: 'Déployer en production?', 
+                              ok: 'Déployer en Production',
+                              submitterParameter: 'APPROVER'
                     }
+                }
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    // Crée le namespace s'il n'existe pas
+                    sh "kubectl get ns prod || kubectl create ns prod"
+                    
+                    // OPTION 1: Utilisation des charts Helm (recommandé)
+                    sh "helm upgrade --install jenkins-exam-app charts/ -n prod --set image.repository=${DOCKER_IMAGE} --set image.tag=${env.BUILD_ID}"
+                    
+                    // OPTION 2: Fallback avec kubectl apply si Helm échoue
+                    sh "kubectl apply -f k8s/prod/ -n prod"
                 }
             }
         }
@@ -74,4 +129,3 @@ pipeline {
         }
     }
 }
-
