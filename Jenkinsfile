@@ -54,7 +54,7 @@ pipeline {
 
         stage('Deploy to QA') {
             when {
-                branch 'main'
+                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
             }
             steps {
                 script {
@@ -66,7 +66,7 @@ pipeline {
 
         stage('Deploy to Staging') {
             when {
-                branch 'main'
+                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
             }
             steps {
                 script {
@@ -78,7 +78,7 @@ pipeline {
 
         stage('Approve Production') {
             when {
-                branch 'main'
+                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
             }
             steps {
                 script {
@@ -93,12 +93,11 @@ pipeline {
 
         stage('Deploy to Production') {
             when {
-                branch 'main'
+                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
             }
             steps {
                 script {
                     sh "kubectl get ns prod || kubectl create ns prod"
-                    // UTILISATION DES CHARTS HELM POUR LA PRODUCTION
                     sh "helm upgrade --install jenkins-exam-app charts/ -n prod --set image.repository=${DOCKER_IMAGE} --set image.tag=${env.BUILD_ID}"
                 }
             }
