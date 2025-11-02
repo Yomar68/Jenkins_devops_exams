@@ -76,32 +76,20 @@ pipeline {
             }
         }
 
-        stage('Approve Production') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                script {
-                    timeout(time: 1, unit: 'HOURS') {
-                        input message: 'Déployer en production?', 
-                              ok: 'Déployer en Production',
-                              submitterParameter: 'APPROVER'
-                    }
-                }
-            }
-        }
-
         stage('Deploy to Production') {
             when {
                 expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
             }
             steps {
                 script {
-                    sh "kubectl get ns prod || kubectl create ns prod"
+                    echo "🚀 DÉPLOIEMENT PRODUCTION AUTOMATIQUE"
+                    echo "Build ID: ${env.BUILD_ID}"
                     
-                    // Version corrigée - utilise set image au lieu de sed
+                    sh "kubectl get ns prod || kubectl create ns prod"
                     sh "kubectl set image deployment/jenkins-exam-app-helm app=yomar68/jenkins-exam-app:${env.BUILD_ID} -n prod"
                     sh "kubectl rollout status deployment/jenkins-exam-app-helm -n prod --timeout=300s"
+                    
+                    echo "✅ DÉPLOIEMENT PRODUCTION RÉUSSI"
                 }
             }
         }
