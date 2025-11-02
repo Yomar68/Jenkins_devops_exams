@@ -99,14 +99,8 @@ pipeline {
                 script {
                     sh "kubectl get ns prod || kubectl create ns prod"
                     
-                    // Met à jour le tag d'image avec celui du build
-                    sh """
-                    sed -i 's|image: yomar68/jenkins-exam-app:.*|image: yomar68/jenkins-exam-app:${env.BUILD_ID}|g' k8s/prod/deployment-helm-style.yaml
-                    cat k8s/prod/deployment-helm-style.yaml | grep image
-                    """
-
-                    // Déploie la version mise à jour
-                    sh "kubectl apply -f k8s/prod/deployment-helm-style.yaml"
+                    // Version corrigée - utilise set image au lieu de sed
+                    sh "kubectl set image deployment/jenkins-exam-app-helm app=yomar68/jenkins-exam-app:${env.BUILD_ID} -n prod"
                     sh "kubectl rollout status deployment/jenkins-exam-app-helm -n prod --timeout=300s"
                 }
             }
