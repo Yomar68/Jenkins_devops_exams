@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins-exam-app-helm
+  namespace: prod
+  labels:
+    app: jenkins-exam-app
+    deployed-by: helm-alternative
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jenkins-exam-app
+  template:
+    metadata:
+      labels:
+        app: jenkins-exam-app
+    spec:
+      containers:
+      - name: app
+        image: yomar68/jenkins-exam-app:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URI
+          value: "sqlite:///./test.db"
+        - name: ENVIRONMENT
+          value: "prod"
