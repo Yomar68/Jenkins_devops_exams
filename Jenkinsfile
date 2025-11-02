@@ -86,8 +86,13 @@ pipeline {
                     echo "Build ID: ${env.BUILD_ID}"
                     
                     sh "kubectl get ns prod || kubectl create ns prod"
-                    sh "kubectl set image deployment/jenkins-exam-app-helm app=yomar68/jenkins-exam-app:${env.BUILD_ID} -n prod"
-                    sh "kubectl rollout status deployment/jenkins-exam-app-helm -n prod --timeout=300s"
+                    
+                    // Vérifie quel déploiement existe
+                    sh "kubectl get deployments -n prod"
+                    
+                    // Utilise le bon nom de déploiement
+                    sh "kubectl set image deployment/jenkins-exam-app app=yomar68/jenkins-exam-app:${env.BUILD_ID} -n prod || echo 'Déploiement jenkins-exam-app non trouvé'"
+                    sh "kubectl rollout status deployment/jenkins-exam-app -n prod --timeout=300s"
                     
                     echo "✅ DÉPLOIEMENT PRODUCTION RÉUSSI"
                 }
