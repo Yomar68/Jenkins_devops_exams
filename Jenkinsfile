@@ -1,115 +1,125 @@
 pipeline {
     agent any
-
+    
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKER_IMAGE = 'yomar68/jenkins-exam-app'
+        DOCKER_IMAGE_MOVIE = "yomar68/movie-service"
+        DOCKER_IMAGE_CAST = "yomar68/cast-service"
         KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
-
+    
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'qa', 'staging'],
+            description: 'Environnement de déploiement'
+        )
+        booleanParam(
+            name: 'DEPLOY_TO_PROD',
+            defaultValue: false,
+            description: 'Déploiement manuel en production'
+        )
+    }
+    
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', 
-                    url: 'https://github.com/Yomar68/Jenkins_devops_exams.git', 
-                    credentialsId: 'github-credentials'
+                checkout scm
             }
         }
-
-        stage('Build') {
-            steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}", "cast-service")
+        
+        stage('Build Images') {
+            parallel {
+                stage('Build Movie Service') {
+                    steps {
+                        sh '''
+                            echo "Construction de movie-service"
+                            docker build -t $DOCKER_IMAGE_MOVIE:$BUILD_NUMBER ./movie-service/
+                            docker tag $DOCKER_IMAGE_MOVIE:$BUILD_NUMBER $DOCKER_IMAGE_MOVIE:latest
+                        '''
+                    }
                 }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                script {
-                    sh 'echo "Running tests..."'
-                }
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    docker.withRegistry('', 'dockerhub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
+                stage('Build Cast Service') {
+                    steps {
+                        sh '''
+                            echo "Construction de cast-service"
+                            docker build -t $DOCKER_IMAGE_CAST:$BUILD_NUMBER ./cast-service/
+                            docker tag $DOCKER_IMAGE_CAST:$BUILD_NUMBER $DOCKER_IMAGE_CAST:latest
+                        '''
                     }
                 }
             }
         }
-
-        stage('Deploy to Dev') {
+        
+        stage('Push to DockerHub') {
+            steps {
+                sh '''
+                    docker login -u $DOCKERHUB_CREDENTIALS_USR -p $DOCKERHUB_CREDENTIALS_PSW
+                    echo "Pushing movie-service"
+                    docker push $DOCKER_IMAGE_MOVIE:$BUILD_NUMBER
+                    docker push $DOCKER_IMAGE_MOVIE:latest
+                    echo "Pushing cast-service"
+                    docker push $DOCKER_IMAGE_CAST:$BUILD_NUMBER
+                    docker push $DOCKER_IMAGE_CAST:latest
+                '''
+            }
+        }
+        
+        stage('Deploy to Environment') {
             steps {
                 script {
-                    sh "kubectl config use-context minikube"
-                    sh "kubectl get ns dev || kubectl create ns dev"
-                    sh "kubectl apply -f k8s/dev/ -n dev"
+                    if (params.DEPLOY_TO_PROD && env.BRANCH_NAME == 'main') {
+                        echo "🚀 DÉPLOIEMENT PRODUCTION MANUEL"
+                        sh """
+                            kubectl get ns prod || kubectl create ns prod
+                            helm upgrade --install movie-service ./k8s-charts/movie-service -n prod --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
+                            helm upgrade --install cast-service ./k8s-charts/cast-service -n prod --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
+                        """
+                    } else if (params.ENVIRONMENT != 'prod') {
+                        echo "Déploiement vers l'environnement ${params.ENVIRONMENT}"
+                        sh """
+                            kubectl get ns ${params.ENVIRONMENT} || kubectl create ns ${params.ENVIRONMENT}
+                            helm upgrade --install movie-service ./k8s-charts/movie-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
+                            helm upgrade --install cast-service ./k8s-charts/cast-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
+                        """
+                    } else {
+                        echo "❌ Déploiement en production non autorisé depuis cette branche"
+                    }
                 }
             }
         }
-
-        stage('Deploy to QA') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
-            }
+        
+        stage('Verify Deployment') {
             steps {
                 script {
-                    sh "kubectl get ns qa || kubectl create ns qa"
-                    sh "kubectl apply -f k8s/qa/ -n qa"
-                }
-            }
-        }
-
-        stage('Deploy to Staging') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                script {
-                    sh "kubectl get ns staging || kubectl create ns staging"
-                    sh "kubectl apply -f k8s/staging/ -n staging"
-                }
-            }
-        }
-
-        stage('Deploy to Production') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.BRANCH_NAME == 'main' }
-            }
-            steps {
-                script {
-                    echo "🚀 DÉPLOIEMENT PRODUCTION AUTOMATIQUE"
-                    echo "Build ID: ${env.BUILD_ID}"
-                    
-                    sh "kubectl get ns prod || kubectl create ns prod"
-                    
-                    // Vérifie quel déploiement existe
-                    sh "kubectl get deployments -n prod"
-                    
-                    // Utilise le bon nom de déploiement
-                    sh "kubectl set image deployment/jenkins-exam-app app=yomar68/jenkins-exam-app:${env.BUILD_ID} -n prod || echo 'Déploiement jenkins-exam-app non trouvé'"
-                    sh "kubectl rollout status deployment/jenkins-exam-app -n prod --timeout=300s"
-                    
-                    echo "✅ DÉPLOIEMENT PRODUCTION RÉUSSI"
+                    if (params.DEPLOY_TO_PROD && env.BRANCH_NAME == 'main') {
+                        sh """
+                            echo "Vérification du déploiement en production..."
+                            kubectl get pods -n prod
+                            kubectl get svc -n prod
+                        """
+                    } else if (params.ENVIRONMENT != 'prod') {
+                        sh """
+                            echo "Vérification du déploiement en ${params.ENVIRONMENT}..."
+                            kubectl get pods -n ${params.ENVIRONMENT}
+                            kubectl get svc -n ${params.ENVIRONMENT}
+                        """
+                    }
                 }
             }
         }
     }
-
+    
     post {
         always {
-            echo 'Pipeline terminée'
+            sh 'echo "Pipeline terminé - Build: $BUILD_NUMBER - Environnement: ${params.ENVIRONMENT}"'
             cleanWs()
         }
         success {
-            echo 'Pipeline réussie!'
+            sh 'echo "✅ SUCCÈS: Pipeline terminé avec succès"'
         }
         failure {
-            echo 'Pipeline échouée!'
+            sh 'echo "❌ ÉCHEC: Pipeline a échoué"'
         }
     }
 }
