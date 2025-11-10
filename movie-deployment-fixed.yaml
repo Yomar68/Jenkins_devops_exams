@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movie-service
+  namespace: dev
+  labels:
+    app: movie-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movie-service
+  template:
+    metadata:
+      labels:
+        app: movie-service
+    spec:
+      containers:
+      - name: movie-service
+        image: yomar68/movie-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URI
+          value: "postgresql://movie_db_username:movie_db_password@movie-db:5432/movie_db_dev"
+        - name: CAST_SERVICE_HOST_URL
+          value: "http://cast-service:80/api/v1/casts/"
+        ports:
+        - containerPort: 8000
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /api/v1/movies/checkapi
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/movies/checkapi
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-security-config
+  namespace: jenkins
+data:
+  security.groovy: |
+    #!groovy
+    import jenkins.model.*
+    import hudson.security.*
+    
+    def instance = Jenkins.getInstance()
+    
+    // Créer un realm de sécurité Jenkins
+    def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+    hudsonRealm.createAccount("admin", "admin123")
+    instance.setSecurityRealm(hudsonRealm)
+    
+    // Configuration de l'autorisation
+    def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+    instance.setAuthorizationStrategy(strategy)
+    
+    instance.save()
