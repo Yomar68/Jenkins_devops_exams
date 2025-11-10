@@ -72,6 +72,14 @@ pipeline {
                         echo "🚀 DÉPLOIEMENT PRODUCTION MANUEL"
                         sh """
                             kubectl get ns prod || kubectl create ns prod
+                            # Nettoyer les déploiements existants
+                            helm uninstall movie-service -n prod 2>/dev/null || true
+                            helm uninstall cast-service -n prod 2>/dev/null || true
+                            kubectl delete deployment movie-service -n prod 2>/dev/null || true
+                            kubectl delete service movie-service -n prod 2>/dev/null || true
+                            kubectl delete deployment cast-service -n prod 2>/dev/null || true
+                            kubectl delete service cast-service -n prod 2>/dev/null || true
+                            # Déployer
                             helm upgrade --install movie-service ./k8s-charts/movie-service -n prod --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
                             helm upgrade --install cast-service ./k8s-charts/cast-service -n prod --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
                         """
@@ -79,6 +87,14 @@ pipeline {
                         echo "Déploiement vers l'environnement ${params.ENVIRONMENT}"
                         sh """
                             kubectl get ns ${params.ENVIRONMENT} || kubectl create ns ${params.ENVIRONMENT}
+                            # Nettoyer les déploiements existants
+                            helm uninstall movie-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            helm uninstall cast-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            kubectl delete deployment movie-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            kubectl delete service movie-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            kubectl delete deployment cast-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            kubectl delete service cast-service -n ${params.ENVIRONMENT} 2>/dev/null || true
+                            # Déployer
                             helm upgrade --install movie-service ./k8s-charts/movie-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
                             helm upgrade --install cast-service ./k8s-charts/cast-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
                         """
