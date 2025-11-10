@@ -68,23 +68,23 @@ pipeline {
         stage('Deploy to Environment') {
             steps {
                 script {
-                    if (params.DEPLOY_TO_PROD && env.BRANCH_NAME == 'main') {
-                        echo "🚀 DÉPLOIEMENT PRODUCTION MANUEL"
-                        sh """
-                            kubectl get ns prod || kubectl create ns prod
-                            helm upgrade --install movie-service ./k8s-charts/movie-service -n prod --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
-                            helm upgrade --install cast-service ./k8s-charts/cast-service -n prod --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
-                        """
-                    } else if (params.ENVIRONMENT != 'prod') {
-                        echo "Déploiement vers l'environnement ${params.ENVIRONMENT}"
-                        sh """
-                            kubectl get ns ${params.ENVIRONMENT} || kubectl create ns ${params.ENVIRONMENT}
-                            helm upgrade --install movie-service ./k8s-charts/movie-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest
-                            helm upgrade --install cast-service ./k8s-charts/cast-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest
-                        """
-                    } else {
-                        echo "❌ Déploiement en production non autorisé depuis cette branche"
-                    }
+                    echo "Déploiement vers l'environnement ${params.ENVIRONMENT}"
+                    sh """
+                        echo "=== Vérification namespace ==="
+                        kubectl get ns ${params.ENVIRONMENT} || kubectl create ns ${params.ENVIRONMENT}
+                        
+                        echo "=== Vérification du répertoire ==="
+                        pwd
+                        ls -la
+                        echo "=== Contenu de k8s-charts ==="
+                        ls -la k8s-charts/
+                        
+                        echo "=== Test helm movie-service ==="
+                        helm upgrade --install movie-service ./k8s-charts/movie-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_MOVIE --set image.tag=latest --dry-run --debug
+                        
+                        echo "=== Test helm cast-service ==="  
+                        helm upgrade --install cast-service ./k8s-charts/cast-service -n ${params.ENVIRONMENT} --set image.repository=$DOCKER_IMAGE_CAST --set image.tag=latest --dry-run --debug
+                    """
                 }
             }
         }
@@ -92,19 +92,11 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 script {
-                    if (params.DEPLOY_TO_PROD && env.BRANCH_NAME == 'main') {
-                        sh """
-                            echo "Vérification du déploiement en production..."
-                            kubectl get pods -n prod
-                            kubectl get svc -n prod
-                        """
-                    } else if (params.ENVIRONMENT != 'prod') {
-                        sh """
-                            echo "Vérification du déploiement en ${params.ENVIRONMENT}..."
-                            kubectl get pods -n ${params.ENVIRONMENT}
-                            kubectl get svc -n ${params.ENVIRONMENT}
-                        """
-                    }
+                    sh """
+                        echo "Vérification du déploiement en ${params.ENVIRONMENT}..."
+                        kubectl get pods -n ${params.ENVIRONMENT}
+                        kubectl get svc -n ${params.ENVIRONMENT}
+                    """
                 }
             }
         }
