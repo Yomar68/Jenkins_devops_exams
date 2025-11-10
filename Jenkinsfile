@@ -112,7 +112,7 @@ pipeline {
     
     post {
         always {
-            sh 'echo "Pipeline terminé - Build: $BUILD_NUMBER - Environnement: ${params.ENVIRONMENT}"'
+            sh "echo 'Pipeline terminé - Build: $BUILD_NUMBER - Environnement: ${params.ENVIRONMENT}'"
             cleanWs()
         }
         success {
